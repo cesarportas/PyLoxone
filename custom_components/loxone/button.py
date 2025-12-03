@@ -45,9 +45,13 @@ async def async_setup_entry(
     loxconfig = miniserver.lox_config.json
     entities = []
 
-    for button_entity in get_all(loxconfig, ["Pushbutton"]):
+    for button_entity in get_all(loxconfig, ["Pushbutton", "NfcCodeTouch"]):
         button_entity = add_room_and_cat_to_value_values(loxconfig, button_entity)
-        entities.append(LoxoneButton(**button_entity))
+
+        if button_entity["type"] == "NfcCodeTouch":
+            entities.append(LoxoneNfcCodeTouchButton(**button_entity))
+        else:
+            entities.append(LoxoneButton(**button_entity))
 
     async_add_entities(entities)
 
@@ -109,6 +113,61 @@ class LoxoneButton(LoxoneEntity, ButtonEntity):
         return {
             "uuid": self.uuidAction,
             "state_uuid": self.states["active"],
+            "room": self.room,
+            "category": self.cat,
+            "device_type": self.type,
+            "platform": "loxone",
+        }
+
+    @property
+    def device_info(self):
+        """Return device information."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self.unique_id)},
+            name=self.name,
+            manufacturer="Loxone",
+            model=self.type,
+            suggested_area=self.room,
+        )
+
+
+class LoxoneNfcCodeTouchButton(LoxoneEntity, ButtonEntity):
+    """Representation of a Loxone NfcCodeTouch as a button."""
+
+    _attr_unique_id: str | None = None
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._attr_icon = "mdi:lock"
+        self._attr_unique_id = self.uuidAction
+
+    @property
+    def icon(self):
+        """Return the icon to use for device if any."""
+        return self._attr_icon
+
+    @cached_property
+    def unique_id(self) -> str:
+        """Return a unique ID."""
+        return self._attr_unique_id
+
+    def press(self, **kwargs):
+        """Press the button (trigger access)."""
+        _LOGGER.debug(
+            f"NfcCodeTouch button pressed for {self.name} with command 'output/1'"
+        )
+        self.hass.bus.fire(SENDDOMAIN, dict(uuid=self.uuidAction, value="output/1"))
+        self.schedule_update_ha_state()
+
+    async def event_handler(self, event):
+        """Handle events - NfcCodeTouch doesn't have active state."""
+        pass
+
+    @property
+    def extra_state_attributes(self):
+        """Return device specific state attributes."""
+        return {
+            "uuid": self.uuidAction,
             "room": self.room,
             "category": self.cat,
             "device_type": self.type,

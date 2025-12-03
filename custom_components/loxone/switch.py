@@ -15,7 +15,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
 from . import LoxoneEntity
-from .const import SENDDOMAIN, SECUREDSENDDOMAIN
+from .const import SENDDOMAIN
 from .helpers import add_room_and_cat_to_value_values, get_all, get_or_create_device
 from .miniserver import get_miniserver_from_hass
 
@@ -42,9 +42,7 @@ async def async_setup_entry(
     loxconfig = miniserver.lox_config.json
     entities = []
 
-    for switch_entity in get_all(
-        loxconfig, ["Switch", "TimedSwitch", "Intercom", "NfcCodeTouch"]
-    ):
+    for switch_entity in get_all(loxconfig, ["Switch", "TimedSwitch", "Intercom"]):
 
         switch_entity = add_room_and_cat_to_value_values(loxconfig, switch_entity)
 
@@ -54,10 +52,6 @@ async def async_setup_entry(
 
         elif switch_entity["type"] == "TimedSwitch":
             new_switch = LoxoneTimedSwitch(**switch_entity)
-            entities.append(new_switch)
-
-        elif switch_entity["type"] == "NfcCodeTouch":
-            new_switch = LoxoneNfcCodeTouch(**switch_entity)
             entities.append(new_switch)
 
         elif switch_entity["type"] == "Intercom":
@@ -279,57 +273,6 @@ class LoxoneIntercomSubControl(LoxoneSwitch):
         return {
             "uuid": self.uuidAction,
             "state_uuid": self.states["active"],
-            "room": self.room,
-            "category": self.cat,
-            "device_type": self.type,
-            "platform": "loxone",
-        }
-
-
-class LoxoneNfcCodeTouch(LoxoneSwitch):
-    """Loxone NfcCodeTouch (used as Gate/Door control)"""
-
-    def __init__(self, **kwargs):
-        LoxoneSwitch.__init__(self, **kwargs)
-        self.type = "NfcCodeTouch"
-        self._attr_device_info = get_or_create_device(
-            self.unique_id, self.name, self.type, self.room
-        )
-        self._icon = "mdi:lock"  # Default icon for access control
-
-    def turn_on(self, **kwargs):
-        """Turn the switch on (trigger access)."""
-        # Send to output/1 (corresponds to q1 in accessOutputs)
-        _LOGGER.debug(
-            f"NfcCodeTouch turn_on called for {self.name} with command 'output/1'"
-        )
-        self.hass.bus.fire(SENDDOMAIN, dict(uuid=self.uuidAction, value="output/1"))
-        # We assume it turns on momentarily
-        self._state = True
-        self.schedule_update_ha_state()
-
-        # Reset state to off immediately as it is a pulse
-        self._state = False
-        self.schedule_update_ha_state()
-
-    def turn_off(self, **kwargs):
-        """Turn the switch off."""
-        _LOGGER.debug(f"NfcCodeTouch turn_off called for {self.name}")
-        self.hass.bus.fire(SENDDOMAIN, dict(uuid=self.uuidAction, value="output/1"))
-        self._state = False
-        self.schedule_update_ha_state()
-
-    async def event_handler(self, event):
-        """Handle events."""
-        # NfcCodeTouch does not have an 'active' state like a normal switch
-        # We could listen for 'jLocked' or other states if needed
-        pass
-
-    @property
-    def extra_state_attributes(self):
-        """Return device specific state attributes."""
-        return {
-            "uuid": self.uuidAction,
             "room": self.room,
             "category": self.cat,
             "device_type": self.type,

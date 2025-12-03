@@ -13,16 +13,28 @@ from typing import Any
 
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
-from homeassistant.components.sensor import (CONF_STATE_CLASS, PLATFORM_SCHEMA,
-                                             SensorDeviceClass, SensorEntity,
-                                             SensorEntityDescription,
-                                             SensorStateClass)
+from homeassistant.components.sensor import (
+    CONF_STATE_CLASS,
+    PLATFORM_SCHEMA,
+    SensorDeviceClass,
+    SensorEntity,
+    SensorEntityDescription,
+    SensorStateClass,
+)
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import (CONF_DEVICE_CLASS, CONF_NAME,
-                                 CONF_UNIT_OF_MEASUREMENT, CONF_VALUE_TEMPLATE,
-                                 LIGHT_LUX, PERCENTAGE, STATE_UNKNOWN,
-                                 UnitOfEnergy, UnitOfPower, UnitOfSpeed,
-                                 UnitOfTemperature)
+from homeassistant.const import (
+    CONF_DEVICE_CLASS,
+    CONF_NAME,
+    CONF_UNIT_OF_MEASUREMENT,
+    CONF_VALUE_TEMPLATE,
+    LIGHT_LUX,
+    PERCENTAGE,
+    STATE_UNKNOWN,
+    UnitOfEnergy,
+    UnitOfPower,
+    UnitOfSpeed,
+    UnitOfTemperature,
+)
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import DeviceInfo
@@ -32,8 +44,7 @@ from homeassistant.util import dt as dt_util
 
 from . import LoxoneEntity
 from .const import CONF_ACTIONID, DOMAIN, SENDDOMAIN, THROTTLE_KEEP_ALIVE_TIME
-from .helpers import (add_room_and_cat_to_value_values, get_all,
-                      get_or_create_device)
+from .helpers import add_room_and_cat_to_value_values, get_all, get_or_create_device
 from .miniserver import get_miniserver_from_hass
 
 NEW_SENSOR = "sensors"
@@ -190,6 +201,10 @@ async def async_setup_entry(
     for sensor in get_all(loxconfig, "TextInput"):
         sensor = add_room_and_cat_to_value_values(loxconfig, sensor)
         entities.append(LoxoneTextSensor(**sensor))
+
+    for sensor in get_all(loxconfig, "TextState"):
+        sensor = add_room_and_cat_to_value_values(loxconfig, sensor)
+        entities.append(LoxoneTextStateSensor(**sensor))
 
     for sensor in get_all(loxconfig, "Meter"):
         _LOGGER.info("Found Meter: %s", sensor)
@@ -457,3 +472,68 @@ class LoxoneMeterSensor(LoxoneSensor, SensorEntity):
             manufacturer="Loxone",
             model=sensor["details"]["type"].capitalize() + " Meter",
         )
+
+
+class LoxoneTextStateSensor(LoxoneEntity, SensorEntity):
+    """Representation of a Loxone TextState sensor (e.g., gate status)."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._state = STATE_UNKNOWN
+        self._icon = None
+
+    async def event_handler(self, e):
+        """Handle state updates from textAndIcon state."""
+        if "textAndIcon" in self.states:
+            if self.states["textAndIcon"] in e.data:
+                self._state = str(e.data[self.states["textAndIcon"]])
+                self.async_schedule_update_ha_state()
+
+        # Also check for iconAndColor to update icon
+        if "iconAndColor" in self.states:
+            if self.states["iconAndColor"] in e.data:
+                icon_data = e.data[self.states["iconAndColor"]]
+                # icon_data is a JSON string like '{"icon":"...", "color":"..."}'
+                try:
+                    import json
+
+                    icon_info = json.loads(icon_data)
+                    if "icon" in icon_info:
+                        # Convert Loxone icon path to mdi icon
+                        icon_path = icon_info["icon"]
+                        if "door" in icon_path.lower():
+                            if "open" in icon_path.lower():
+                                self._icon = "mdi:door-open"
+                            elif "close" in icon_path.lower():
+                                self._icon = "mdi:door-closed"
+                            else:
+                                self._icon = "mdi:door"
+                        elif (
+                            "car" in icon_path.lower() or "garage" in icon_path.lower()
+                        ):
+                            self._icon = "mdi:garage"
+                        else:
+                            self._icon = "mdi:information"
+                except Exception:
+                    pass
+
+    @property
+    def icon(self):
+        """Return the icon."""
+        return self._icon or "mdi:information"
+
+    @property
+    def native_value(self):
+        """Return the state of the sensor."""
+        return self._state
+
+    @property
+    def extra_state_attributes(self):
+        """Return device specific state attributes."""
+        return {
+            "uuid": self.uuidAction,
+            "device_type": self.type,
+            "platform": "loxone",
+            "room": self.room,
+            "category": self.cat,
+        }
