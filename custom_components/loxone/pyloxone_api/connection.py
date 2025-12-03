@@ -1244,11 +1244,8 @@ class LoxoneConnection(LoxoneBaseConnection):
                     f"Got TextMessage: {mess_obj.message[:200] if len(mess_obj.message) > 200 else mess_obj.message}"
                 )
                 # Check if this is a getvisusalt response
-                if "getvisusalt" in mess_obj.message or (
-                    hasattr(mess_obj, "control")
-                    and mess_obj.control
-                    and "getvisusalt" in mess_obj.control
-                ):
+                # mess_obj.control might be bytes, so we check the message string instead
+                if "getvisusalt" in mess_obj.message:
                     try:
                         _LOGGER.debug(
                             f"Processing visual salt response: {mess_obj.message}"
