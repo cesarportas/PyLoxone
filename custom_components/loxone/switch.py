@@ -323,6 +323,12 @@ class LoxoneNfcCodeTouch(LoxoneSwitch):
         self._state = False
         self.schedule_update_ha_state()
 
+    async def event_handler(self, event):
+        """Handle events."""
+        # NfcCodeTouch does not have an 'active' state like a normal switch
+        # We could listen for 'jLocked' or other states if needed
+        pass
+
     @property
     def extra_state_attributes(self):
         """Return device specific state attributes."""
