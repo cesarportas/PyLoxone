@@ -705,6 +705,10 @@ class LoxoneConnection(LoxoneBaseConnection):
                         )
                         # Continue listening despite processing errors
 
+                    _LOGGER.debug(
+                        f"Received message type: {list(MessageType)[message.message_type].name}"
+                    )
+                    
                     if callback and message.message_type in [
                         MessageType.VALUE_STATES,
                         MessageType.TEXT_STATES,
@@ -712,7 +716,11 @@ class LoxoneConnection(LoxoneBaseConnection):
                         MessageType.KEEPALIVE,
                     ]:
                         try:
-                            awaitable = callback(message.as_dict())
+                            message_dict = message.as_dict()
+                            _LOGGER.debug(f"Message dict keys: {list(message_dict.keys())[:20]}")
+                            if message.message_type == MessageType.TEXT_STATES:
+                                _LOGGER.info(f"TEXT_STATES message received with {len(message_dict)} updates: {list(message_dict.keys())[:10]}")
+                            awaitable = callback(message_dict)
                             if awaitable:
                                 await awaitable
                         except Exception as e:
