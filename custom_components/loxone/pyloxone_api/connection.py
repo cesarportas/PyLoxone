@@ -665,8 +665,11 @@ class LoxoneConnection(LoxoneBaseConnection):
         try:
             while True:
                 try:
-                    if not connection or connection.state.state.name == "CLOSED":
-                        raise LoxoneConnectionError("Connection is closed")
+                    # Check if connection exists
+                    # The state check was causing issues, so we just verify connection exists
+                    # and let websocket exceptions handle closed connections
+                    if not connection:
+                        raise LoxoneConnectionError("Connection is None")
 
                     try:
                         message = await asyncio.wait_for(
