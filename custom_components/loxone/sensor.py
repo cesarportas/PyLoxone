@@ -488,7 +488,7 @@ class LoxoneTextStateSensor(LoxoneEntity, SensorEntity):
     async def event_handler(self, e):
         """Handle state updates from Loxone TextState."""
         _LOGGER.debug(
-            f"TextState event_handler called for {self.name}, event data keys: {list(e.data.keys())[:10]}"
+            f"TextState event_handler called for {self.name}, UUID: {self.uuidAction}, event data: {e.data}"
         )
 
         # Check if our uuidAction is in the event data
