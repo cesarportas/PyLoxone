@@ -481,18 +481,29 @@ class LoxoneTextStateSensor(LoxoneEntity, SensorEntity):
         super().__init__(**kwargs)
         self._state = STATE_UNKNOWN
         self._icon = None
+        _LOGGER.debug(
+            f"Created TextState sensor: {self.name}, UUID: {self.uuidAction}, States: {self.states}"
+        )
 
     async def event_handler(self, e):
         """Handle state updates from textAndIcon state."""
+        _LOGGER.debug(
+            f"TextState event_handler called for {self.name}, event data keys: {list(e.data.keys())[:10]}"
+        )
+
         if "textAndIcon" in self.states:
-            if self.states["textAndIcon"] in e.data:
-                self._state = str(e.data[self.states["textAndIcon"]])
+            text_uuid = self.states["textAndIcon"]
+            if text_uuid in e.data:
+                self._state = str(e.data[text_uuid])
+                _LOGGER.debug(f"TextState {self.name} updated to: {self._state}")
                 self.async_schedule_update_ha_state()
 
         # Also check for iconAndColor to update icon
         if "iconAndColor" in self.states:
-            if self.states["iconAndColor"] in e.data:
-                icon_data = e.data[self.states["iconAndColor"]]
+            icon_uuid = self.states["iconAndColor"]
+            if icon_uuid in e.data:
+                icon_data = e.data[icon_uuid]
+                _LOGGER.debug(f"TextState {self.name} icon data: {icon_data}")
                 # icon_data is a JSON string like '{"icon":"...", "color":"..."}'
                 try:
                     import json
@@ -514,8 +525,11 @@ class LoxoneTextStateSensor(LoxoneEntity, SensorEntity):
                             self._icon = "mdi:garage"
                         else:
                             self._icon = "mdi:information"
-                except Exception:
-                    pass
+                        _LOGGER.debug(
+                            f"TextState {self.name} icon updated to: {self._icon}"
+                        )
+                except Exception as ex:
+                    _LOGGER.debug(f"Error parsing icon data: {ex}")
 
     @property
     def icon(self):
