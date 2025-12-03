@@ -1239,47 +1239,53 @@ class LoxoneConnection(LoxoneBaseConnection):
                     _LOGGER.error(f"Error processing getkey: {e}")
 
             # Handle visual salt
-            elif (
-                isinstance(mess_obj, TextMessage) and "getvisusalt" in mess_obj.message
-            ):
-                try:
-                    _LOGGER.debug(
-                        f"Processing visual salt response: {mess_obj.message}"
-                    )
-                    value_dict = mess_obj.value_as_dict
-                    if not isinstance(value_dict, dict):
-                        raise ValueError("value_as_dict is not a dictionary")
-                    self._key = value_dict.get("value", "")
+            elif isinstance(mess_obj, TextMessage):
+                _LOGGER.debug(
+                    f"Got TextMessage: {mess_obj.message[:200] if len(mess_obj.message) > 200 else mess_obj.message}"
+                )
+                if "getvisusalt" in mess_obj.message:
+                    try:
+                        _LOGGER.debug(
+                            f"Processing visual salt response: {mess_obj.message}"
+                        )
+                        value_dict = mess_obj.value_as_dict
+                        if not isinstance(value_dict, dict):
+                            raise ValueError("value_as_dict is not a dictionary")
+                        self._key = value_dict.get("value", "")
 
-                    key_and_salt = LxJsonKeySalt()
-                    key_and_salt.read_user_salt_response(mess_obj.message)
-                    key_and_salt.time_elapsed_in_seconds = time_elapsed_in_seconds()
-                    self._visual_hash = key_and_salt
-                    _LOGGER.debug(
-                        f"Visual hash set: salt={self._visual_hash.salt}, key={self._visual_hash.key}"
-                    )
+                        key_and_salt = LxJsonKeySalt()
+                        key_and_salt.read_user_salt_response(mess_obj.message)
+                        key_and_salt.time_elapsed_in_seconds = time_elapsed_in_seconds()
+                        self._visual_hash = key_and_salt
+                        _LOGGER.debug(
+                            f"Visual hash set: salt={self._visual_hash.salt}, key={self._visual_hash.key}"
+                        )
 
-                    queue_size = self._secured_queue.qsize()
-                    _LOGGER.debug(f"Processing secured queue, size: {queue_size}")
-                    while not self._secured_queue.empty():
-                        try:
-                            awaitable = self._secured_queue.get(timeout=0.1)
-                            _LOGGER.debug(
-                                f"Executing secured command from queue: {awaitable}"
-                            )
-                            if awaitable:
-                                await awaitable
-                                _LOGGER.debug("Secured command executed successfully")
-                        except Empty:
-                            break
-                        except Exception as e:
-                            _LOGGER.error(
-                                f"Error processing secured queue item: {e}",
-                                exc_info=True,
-                            )
+                        queue_size = self._secured_queue.qsize()
+                        _LOGGER.debug(f"Processing secured queue, size: {queue_size}")
+                        while not self._secured_queue.empty():
+                            try:
+                                awaitable = self._secured_queue.get(timeout=0.1)
+                                _LOGGER.debug(
+                                    f"Executing secured command from queue: {awaitable}"
+                                )
+                                if awaitable:
+                                    await awaitable
+                                    _LOGGER.debug(
+                                        "Secured command executed successfully"
+                                    )
+                            except Empty:
+                                break
+                            except Exception as e:
+                                _LOGGER.error(
+                                    f"Error processing secured queue item: {e}",
+                                    exc_info=True,
+                                )
 
-                except Exception as e:
-                    _LOGGER.error(f"Error processing visual salt: {e}", exc_info=True)
+                    except Exception as e:
+                        _LOGGER.error(
+                            f"Error processing visual salt: {e}", exc_info=True
+                        )
 
             # Handle token response
             elif isinstance(mess_obj, TextMessage) and (
