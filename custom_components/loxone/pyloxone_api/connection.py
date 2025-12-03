@@ -843,9 +843,30 @@ class LoxoneConnection(LoxoneBaseConnection):
                     lox_app_data.content.read(), timeout=self.timeout or TIMEOUT
                 )
                 self.structure_file = json.loads(data)
-                self.structure_file["softwareVersion"] = (
-                    self.miniserver_version
-                )  # FIXME Legacy use only. Need to fix pyloxone
+                self.structure_file["softwareVersion"] = self.miniserver_version.copy()
+
+                # Debug logging to help diagnose device discovery
+                _LOGGER.info("Structure file loaded successfully")
+                if "controls" in self.structure_file:
+                    control_types = {}
+                    for control_uuid, control in self.structure_file[
+                        "controls"
+                    ].items():
+                        control_type = control.get("type", "Unknown")
+                        control_types[control_type] = (
+                            control_types.get(control_type, 0) + 1
+                        )
+                    _LOGGER.info(
+                        f"Found {len(self.structure_file['controls'])} controls in structure file"
+                    )
+                    _LOGGER.info(f"Control types: {control_types}")
+                else:
+                    _LOGGER.warning("No 'controls' key found in structure file!")
+
+                if "rooms" in self.structure_file:
+                    _LOGGER.info(f"Found {len(self.structure_file['rooms'])} rooms")
+                if "cats" in self.structure_file:
+                    _LOGGER.info(f"Found {len(self.structure_file['cats'])} categories")
             except asyncio.TimeoutError:
                 raise TimeoutError("Timeout reading structure file")
             except json.JSONDecodeError as e:
