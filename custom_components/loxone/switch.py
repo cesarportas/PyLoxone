@@ -299,13 +299,11 @@ class LoxoneNfcCodeTouch(LoxoneSwitch):
 
     def turn_on(self, **kwargs):
         """Turn the switch on (trigger access)."""
-        # Use SECUREDSENDDOMAIN for encrypted commands
+        # Send to output/1 (corresponds to q1 in accessOutputs)
         _LOGGER.debug(
-            f"NfcCodeTouch turn_on called for {self.name} with secured command 'pulse'"
+            f"NfcCodeTouch turn_on called for {self.name} with command 'output/1'"
         )
-        self.hass.bus.fire(
-            SECUREDSENDDOMAIN, dict(uuid=self.uuidAction, value="pulse", code="0")
-        )
+        self.hass.bus.fire(SENDDOMAIN, dict(uuid=self.uuidAction, value="output/1"))
         # We assume it turns on momentarily
         self._state = True
         self.schedule_update_ha_state()
@@ -317,9 +315,7 @@ class LoxoneNfcCodeTouch(LoxoneSwitch):
     def turn_off(self, **kwargs):
         """Turn the switch off."""
         _LOGGER.debug(f"NfcCodeTouch turn_off called for {self.name}")
-        self.hass.bus.fire(
-            SECUREDSENDDOMAIN, dict(uuid=self.uuidAction, value="off", code="0")
-        )
+        self.hass.bus.fire(SENDDOMAIN, dict(uuid=self.uuidAction, value="output/1"))
         self._state = False
         self.schedule_update_ha_state()
 
