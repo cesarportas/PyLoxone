@@ -949,11 +949,13 @@ class LoxoneConnection(LoxoneBaseConnection):
 
             # Create SSL context to handle self-signed certificates
             # This matches the HTTP client's ssl=False behavior
+            # Use SSLContext directly to avoid blocking call to load_default_certs
             import ssl
 
             ssl_context = None
             if self.scheme == "https":
-                ssl_context = ssl.create_default_context()
+                # Create SSL context without loading default certs to avoid blocking
+                ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
                 ssl_context.check_hostname = False
                 ssl_context.verify_mode = ssl.CERT_NONE
                 _LOGGER.debug(
