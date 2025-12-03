@@ -944,11 +944,25 @@ class LoxoneConnection(LoxoneBaseConnection):
             else:
                 base_url = self._URL_FORMAT.format(**params)
 
+            # Create SSL context to handle self-signed certificates
+            # This matches the HTTP client's ssl=False behavior
+            import ssl
+
+            ssl_context = None
+            if self.scheme == "https":
+                ssl_context = ssl.create_default_context()
+                ssl_context.check_hostname = False
+                ssl_context.verify_mode = ssl.CERT_NONE
+                _LOGGER.debug(
+                    "SSL context created with certificate verification disabled"
+                )
+
             try:
                 ws_connection = await asyncio.wait_for(
                     wslib.connect(
                         base_url,
                         open_timeout=self.timeout or TIMEOUT,
+                        ssl=ssl_context,
                         compression=None,
                         max_size=MAX_WEBSOCKET_MESSAGE_SIZE,
                     ),
