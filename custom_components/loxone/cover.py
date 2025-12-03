@@ -152,16 +152,17 @@ class LoxoneNfcCodeTouch(LoxoneEntity, CoverEntity):
 
     def open_cover(self, **kwargs):
         """Open the cover (trigger access)."""
-        # Sending 'open' or 'pulse' usually triggers the access output
-        self.hass.bus.fire(SENDDOMAIN, dict(uuid=self.uuidAction, value="open"))
+        # Sending 'on' usually triggers the access output for NfcCodeTouch
+        _LOGGER.debug(f"NfcCodeTouch open_cover called for {self.name}")
+        self.hass.bus.fire(SENDDOMAIN, dict(uuid=self.uuidAction, value="on"))
         self._closed = False
         self.schedule_update_ha_state()
 
     def close_cover(self, **kwargs):
         """Close the cover."""
-        # NfcCodeTouch might not have a close command if it's just a trigger,
-        # but we provide it for compatibility
-        self.hass.bus.fire(SENDDOMAIN, dict(uuid=self.uuidAction, value="close"))
+        # For a gate, 'off' might not do anything if it's pulse-based, but we'll try
+        _LOGGER.debug(f"NfcCodeTouch close_cover called for {self.name}")
+        self.hass.bus.fire(SENDDOMAIN, dict(uuid=self.uuidAction, value="off"))
         self._closed = True
         self.schedule_update_ha_state()
 
