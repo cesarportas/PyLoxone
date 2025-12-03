@@ -9,9 +9,13 @@ import logging
 import random
 from typing import Any
 
-from homeassistant.components.cover import (ATTR_POSITION, ATTR_TILT_POSITION,
-                                            CoverDeviceClass, CoverEntity,
-                                            CoverEntityFeature)
+from homeassistant.components.cover import (
+    ATTR_POSITION,
+    ATTR_TILT_POSITION,
+    CoverDeviceClass,
+    CoverEntity,
+    CoverEntityFeature,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_OFF, STATE_ON
 from homeassistant.core import HomeAssistant, callback
@@ -21,11 +25,20 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
 from . import LoxoneEntity
-from .const import (SENDDOMAIN, SERVICE_DISABLE_SUN_AUTOMATION,
-                    SERVICE_ENABLE_SUN_AUTOMATION, SERVICE_QUICK_SHADE,
-                    SUPPORT_QUICK_SHADE, SUPPORT_SUN_AUTOMATION)
-from .helpers import (add_room_and_cat_to_value_values, get_all,
-                      get_or_create_device, map_range)
+from .const import (
+    SENDDOMAIN,
+    SERVICE_DISABLE_SUN_AUTOMATION,
+    SERVICE_ENABLE_SUN_AUTOMATION,
+    SERVICE_QUICK_SHADE,
+    SUPPORT_QUICK_SHADE,
+    SUPPORT_SUN_AUTOMATION,
+)
+from .helpers import (
+    add_room_and_cat_to_value_values,
+    get_all,
+    get_or_create_device,
+    map_range,
+)
 from .miniserver import get_miniserver_from_hass
 
 _LOGGER = logging.getLogger(__name__)
@@ -53,7 +66,7 @@ async def async_setup_entry(
     loxconfig = miniserver.lox_config.json
     entities = []
 
-    for cover in get_all(loxconfig, ["Jalousie", "Gate", "Window"]):
+    for cover in get_all(loxconfig, ["Jalousie", "Gate", "Window", "NfcCodeTouch"]):
         cover = add_room_and_cat_to_value_values(loxconfig, cover)
         cover.update(
             {
@@ -66,6 +79,9 @@ async def async_setup_entry(
         elif cover["type"] == "Window":
             new_window = LoxoneWindow(**cover)
             entities.append(new_window)
+        elif cover["type"] == "NfcCodeTouch":
+            new_nfc = LoxoneNfcCodeTouch(**cover)
+            entities.append(new_nfc)
         else:
             new_jalousie = LoxoneJalousie(**cover)
             entities.append(new_jalousie)
@@ -97,6 +113,66 @@ async def async_setup_entry(
         {},
         "quick_shade",
     )
+
+
+class LoxoneNfcCodeTouch(LoxoneEntity, CoverEntity):
+    """Loxone NfcCodeTouch (used as Gate/Door control)"""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.hass = kwargs["hass"]
+        self._position = None
+        self._closed = True
+        self.type = "NfcCodeTouch"
+        self._attr_device_info = get_or_create_device(
+            self.unique_id, self.name, self.type, self.room
+        )
+
+    @property
+    def supported_features(self):
+        """Flag supported features."""
+        return (
+            CoverEntityFeature.OPEN | CoverEntityFeature.CLOSE | CoverEntityFeature.STOP
+        )
+
+    @property
+    def should_poll(self):
+        """No polling needed."""
+        return False
+
+    @property
+    def device_class(self):
+        """Return the class of this device."""
+        return CoverDeviceClass.GATE
+
+    @property
+    def is_closed(self):
+        """Return if the cover is closed."""
+        return self._closed
+
+    def open_cover(self, **kwargs):
+        """Open the cover (trigger access)."""
+        # Sending 'open' or 'pulse' usually triggers the access output
+        self.hass.bus.fire(SENDDOMAIN, dict(uuid=self.uuidAction, value="open"))
+        self._closed = False
+        self.schedule_update_ha_state()
+
+    def close_cover(self, **kwargs):
+        """Close the cover."""
+        # NfcCodeTouch might not have a close command if it's just a trigger,
+        # but we provide it for compatibility
+        self.hass.bus.fire(SENDDOMAIN, dict(uuid=self.uuidAction, value="close"))
+        self._closed = True
+        self.schedule_update_ha_state()
+
+    def stop_cover(self, **kwargs):
+        """Stop the cover."""
+        self.hass.bus.fire(SENDDOMAIN, dict(uuid=self.uuidAction, value="reset"))
+
+    async def event_handler(self, event):
+        # Handle events if needed, though NfcCodeTouch events are usually about auth
+        # We might want to listen for 'access' events to update state
+        pass
 
 
 class LoxoneGate(LoxoneEntity, CoverEntity):
