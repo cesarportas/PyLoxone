@@ -486,19 +486,35 @@ class LoxoneTextStateSensor(LoxoneEntity, SensorEntity):
         )
 
     async def event_handler(self, e):
-        """Handle state updates from textAndIcon state."""
+        """Handle state updates from Loxone TextState."""
         _LOGGER.debug(
             f"TextState event_handler called for {self.name}, event data keys: {list(e.data.keys())[:10]}"
         )
 
-        if "textAndIcon" in self.states:
+        # Check if our uuidAction is in the event data
+        if self.uuidAction in e.data:
+            data = e.data[self.uuidAction]
+            # TextState can send the value directly as a string
+            if isinstance(data, str):
+                self._state = data
+            else:
+                self._state = str(data)
+            _LOGGER.debug(f"TextState {self.name} updated to: {self._state}")
+            self.async_schedule_update_ha_state()
+        
+        # Also check for textAndIcon state UUID (if different from uuidAction)
+        elif "textAndIcon" in self.states:
             text_uuid = self.states["textAndIcon"]
             if text_uuid in e.data:
-                self._state = str(e.data[text_uuid])
-                _LOGGER.debug(f"TextState {self.name} updated to: {self._state}")
+                data = e.data[text_uuid]
+                if isinstance(data, str):
+                    self._state = data
+                else:
+                    self._state = str(data)
+                _LOGGER.debug(f"TextState {self.name} updated via textAndIcon to: {self._state}")
                 self.async_schedule_update_ha_state()
 
-        # Also check for iconAndColor to update icon
+        # Check for iconAndColor to update icon
         if "iconAndColor" in self.states:
             icon_uuid = self.states["iconAndColor"]
             if icon_uuid in e.data:
@@ -528,6 +544,7 @@ class LoxoneTextStateSensor(LoxoneEntity, SensorEntity):
                         _LOGGER.debug(
                             f"TextState {self.name} icon updated to: {self._icon}"
                         )
+                        self.async_schedule_update_ha_state()
                 except Exception as ex:
                     _LOGGER.debug(f"Error parsing icon data: {ex}")
 
