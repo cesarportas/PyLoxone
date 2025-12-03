@@ -220,8 +220,8 @@ class LoxoneBaseConnection:
         self._salt: str = ""
         self._salt_used_count: int = 0
         self._visual_hash = None
-        self._message_queue: Queue[MessageForQueue] = Queue()
-        self._secured_queue = Queue(maxsize=1)
+        self._message_queue = Queue(maxsize=1000)
+        self._secured_queue = Queue(maxsize=50)
         self.message_header = None
 
     def get_token_dict(self) -> dict:
@@ -1099,12 +1099,13 @@ class LoxoneConnection(LoxoneBaseConnection):
             _LOGGER.debug(f"Call send_secured__websocket_command: {command}")
 
             try:
-                message = await self._send_secure(device_uuid, value, code)
-                self._secured_queue.put(message, timeout=1.0)
+                coro = self._send_secure(device_uuid, value, code)
+                self._secured_queue.put(coro, timeout=1.0)
                 self._message_queue.put(
                     MessageForQueue(command=command, flag=True), timeout=1.0
                 )
             except Full:
+                coro.close()
                 raise RuntimeError("Queue is full, cannot send secured command")
         except Exception as e:
             _LOGGER.error(f"Failed to send secured websocket command: {e}")
