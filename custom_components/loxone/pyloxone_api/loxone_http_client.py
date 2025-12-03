@@ -12,10 +12,12 @@ import warnings
 import aiohttp
 
 from .const import TIMEOUT
-from .exceptions import (LoxoneMaxNumOfConnectionsError,
-                         LoxoneServiceUnAvailableError,
-                         LoxoneUnauthorisedError,
-                         LoxoneUnrecognizedCommandError)
+from .exceptions import (
+    LoxoneMaxNumOfConnectionsError,
+    LoxoneServiceUnAvailableError,
+    LoxoneUnauthorisedError,
+    LoxoneUnrecognizedCommandError,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -74,6 +76,7 @@ class LoxoneAsyncHttpClient:
             _LOGGER.debug(f"Making GET request to: {url}")
             response = await self.session.get(
                 url,
+                ssl=False,
                 auth=aiohttp.BasicAuth(self.username, self.password),
                 timeout=aiohttp.ClientTimeout(total=self.timeout),
             )

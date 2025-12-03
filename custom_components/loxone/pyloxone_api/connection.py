@@ -28,23 +28,54 @@ from Crypto.PublicKey import RSA
 from Crypto.Random import get_random_bytes
 from Crypto.Util import Padding
 
-from .const import (AES_KEY_SIZE, CMD_AUTH_WITH_TOKEN, CMD_ENABLE_UPDATES,
-                    CMD_GET_API_KEY, CMD_GET_KEY, CMD_GET_KEY_AND_SALT,
-                    CMD_GET_PUBLIC_KEY, CMD_GET_VISUAL_PASSWD, CMD_KEEP_ALIVE,
-                    CMD_KEY_EXCHANGE, CMD_REFRESH_TOKEN,
-                    CMD_REFRESH_TOKEN_JSON_WEB, CMD_REQUEST_TOKEN,
-                    CMD_REQUEST_TOKEN_JSON_WEB, DELAY_CHECK_TOKEN_REFRESH,
-                    IV_BYTES, KEEP_ALIVE_PERIOD, LOXAPPPATH, MAX_REFRESH_DELAY,
-                    MAX_WEBSOCKET_MESSAGE_SIZE, RECONNECT_DELAY,
-                    RECONNECT_TRIES, SALT_BYTES, SALT_MAX_AGE_SECONDS,
-                    SALT_MAX_USE_COUNT, TIMEOUT, TOKEN_PERMISSION)
-from .exceptions import (LoxoneConnectionClosedOk, LoxoneConnectionError,
-                         LoxoneException, LoxoneOutOfServiceException,
-                         LoxoneServiceUnAvailableError, LoxoneTokenError)
+from .const import (
+    AES_KEY_SIZE,
+    CMD_AUTH_WITH_TOKEN,
+    CMD_ENABLE_UPDATES,
+    CMD_GET_API_KEY,
+    CMD_GET_KEY,
+    CMD_GET_KEY_AND_SALT,
+    CMD_GET_PUBLIC_KEY,
+    CMD_GET_VISUAL_PASSWD,
+    CMD_KEEP_ALIVE,
+    CMD_KEY_EXCHANGE,
+    CMD_REFRESH_TOKEN,
+    CMD_REFRESH_TOKEN_JSON_WEB,
+    CMD_REQUEST_TOKEN,
+    CMD_REQUEST_TOKEN_JSON_WEB,
+    DELAY_CHECK_TOKEN_REFRESH,
+    IV_BYTES,
+    KEEP_ALIVE_PERIOD,
+    LOXAPPPATH,
+    MAX_REFRESH_DELAY,
+    MAX_WEBSOCKET_MESSAGE_SIZE,
+    RECONNECT_DELAY,
+    RECONNECT_TRIES,
+    SALT_BYTES,
+    SALT_MAX_AGE_SECONDS,
+    SALT_MAX_USE_COUNT,
+    TIMEOUT,
+    TOKEN_PERMISSION,
+)
+from .exceptions import (
+    LoxoneConnectionClosedOk,
+    LoxoneConnectionError,
+    LoxoneException,
+    LoxoneOutOfServiceException,
+    LoxoneServiceUnAvailableError,
+    LoxoneTokenError,
+)
 from .loxone_http_client import LoxoneAsyncHttpClient
 from .loxone_token import LoxoneToken, LxJsonKeySalt
-from .message import (BaseMessage, BinaryFile, Keepalive, LLResponse,
-                      MessageType, TextMessage, parse_message)
+from .message import (
+    BaseMessage,
+    BinaryFile,
+    Keepalive,
+    LLResponse,
+    MessageType,
+    TextMessage,
+    parse_message,
+)
 from .websocket_protocol import LoxoneClientConnection
 
 _LOGGER = logging.getLogger(__name__)
@@ -104,7 +135,7 @@ class LoxoneBaseConnection:
         self.token = token
         self.port = port
         self.timeout = None if timeout == 0 else timeout
-        self.connection: wslib.ClientConnection | None = None
+        self.connection: LoxoneClientConnection | None = None
         self._recv_loop: Optional[Any] = None
         self._pending_task = []
         self._closed = False
@@ -634,7 +665,7 @@ class LoxoneConnection(LoxoneBaseConnection):
         try:
             while True:
                 try:
-                    if not connection or connection.state == connection.state.CLOSED:
+                    if not connection or connection.state.state.name == "CLOSED":
                         raise LoxoneConnectionError("Connection is closed")
 
                     try:
@@ -914,16 +945,17 @@ class LoxoneConnection(LoxoneBaseConnection):
                 base_url = self._URL_FORMAT.format(**params)
 
             try:
-                connection = await asyncio.wait_for(
+                ws_connection = await asyncio.wait_for(
                     wslib.connect(
                         base_url,
                         open_timeout=self.timeout or TIMEOUT,
-                        create_connection=LoxoneClientConnection,
                         compression=None,
                         max_size=MAX_WEBSOCKET_MESSAGE_SIZE,
                     ),
                     timeout=(self.timeout or TIMEOUT) * 2,
                 )
+                # Wrap the websocket connection in our custom LoxoneClientConnection
+                connection = LoxoneClientConnection(ws_connection)
             except asyncio.TimeoutError:
                 raise TimeoutError(f"Timeout connecting to websocket at {base_url}")
             except websockets.exceptions.InvalidURI as e:

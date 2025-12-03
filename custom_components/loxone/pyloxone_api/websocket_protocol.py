@@ -9,13 +9,16 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import AsyncIterable, Iterable, NoReturn, Union
-
-from websockets import ClientConnection
+from typing import AsyncIterable, Iterable, NoReturn, Union, Any
 
 from .exceptions import LoxoneException, LoxoneOutOfServiceException
-from .message import (BaseMessage, MessageType, check_and_decode_if_needed,
-                      parse_header, parse_message)
+from .message import (
+    BaseMessage,
+    MessageType,
+    check_and_decode_if_needed,
+    parse_header,
+    parse_message,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,16 +32,40 @@ Data = Union[str, bytes]
 """
 
 
-class LoxoneClientConnection(ClientConnection):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+class LoxoneClientConnection:
+    """Wrapper around a websocket connection with Loxone-specific functionality.
+
+    This class uses composition to wrap a websocket connection object and adds
+    custom message handling for the Loxone protocol.
+    """
+
+    def __init__(self, websocket):
+        """Initialize the Loxone client connection wrapper.
+
+        Args:
+            websocket: The underlying websocket connection object from websockets library
+        """
+        self._websocket = websocket
         self._last_header = None
         from queue import Queue
 
         self._message_queue = Queue(maxsize=1000)
 
-    async def recv(self, decode: bool | None = False) -> str | bytes:
-        result = await super().recv(decode)
+    @property
+    def state(self):
+        """Expose the state of the underlying websocket connection."""
+        return self._websocket
+
+    async def recv(self, decode: bool | None = None) -> str | bytes:
+        """Receive a message from the websocket.
+
+        Args:
+            decode: Optional parameter for compatibility (not used in websockets 14+)
+
+        Returns:
+            The received message as str or bytes
+        """
+        result = await self._websocket.recv()
         _LOGGER.debug(f"Received: {result[:80]!r}")
         return result
 
@@ -47,9 +74,15 @@ class LoxoneClientConnection(ClientConnection):
         message: Data | Iterable[Data] | AsyncIterable[Data],
         text: bool | None = None,
     ) -> None:
+        """Send a message through the websocket.
+
+        Args:
+            message: The message to send
+            text: Optional parameter for compatibility (not used in websockets 14+)
+        """
         _LOGGER.debug(f"Sent:{message}")
-        result = await super().send(message, text)
-        return result
+        await self._websocket.send(message)
+        return None
 
     async def recv_message(self) -> BaseMessage:
         """Receive a header and message from the miniserver""
