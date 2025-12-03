@@ -1099,9 +1099,8 @@ class LoxoneConnection(LoxoneBaseConnection):
             _LOGGER.debug(f"Call send_secured__websocket_command: {command}")
 
             try:
-                self._secured_queue.put(
-                    self._send_secure(device_uuid, value, code), timeout=1.0
-                )
+                message = await self._send_secure(device_uuid, value, code)
+                self._secured_queue.put(message, timeout=1.0)
                 self._message_queue.put(
                     MessageForQueue(command=command, flag=True), timeout=1.0
                 )
