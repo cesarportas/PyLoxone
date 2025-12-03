@@ -714,12 +714,16 @@ class LoxoneConnection(LoxoneBaseConnection):
                         MessageType.TEXT_STATES,
                         MessageType.TEXT,
                         MessageType.KEEPALIVE,
+                        MessageType.BINARY,  # Process BINARY messages (contain gzipped state updates)
                     ]:
                         try:
                             message_dict = message.as_dict()
-                            _LOGGER.debug(f"Message dict keys: {list(message_dict.keys())[:20]}")
-                            if message.message_type == MessageType.TEXT_STATES:
-                                _LOGGER.info(f"TEXT_STATES message received with {len(message_dict)} updates: {list(message_dict.keys())[:10]}")
+                            if message_dict:  # Only log if there's actual data
+                                _LOGGER.debug(f"Message dict keys: {list(message_dict.keys())[:20]}")
+                                if message.message_type == MessageType.TEXT_STATES:
+                                    _LOGGER.info(f"TEXT_STATES message received with {len(message_dict)} updates: {list(message_dict.keys())[:10]}")
+                                elif message.message_type == MessageType.BINARY:
+                                    _LOGGER.info(f"BINARY message processed with {len(message_dict)} state updates")
                             awaitable = callback(message_dict)
                             if awaitable:
                                 await awaitable
@@ -729,9 +733,6 @@ class LoxoneConnection(LoxoneBaseConnection):
                         _LOGGER.debug(
                             f"Message type {list(MessageType)[message.message_type].name} not handled yet ..."
                         )
-                        _ = message.as_dict()
-                        if _ != {}:
-                            _LOGGER.debug(f"Message {message.as_dict()}")
 
                 except asyncio.CancelledError:
                     raise

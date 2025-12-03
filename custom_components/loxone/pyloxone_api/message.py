@@ -5,6 +5,7 @@ For more details about this component, please refer to the documentation at
 https://github.com/JoDehli/pyloxone-api
 """
 
+import gzip
 import json
 import logging
 import math
@@ -180,9 +181,64 @@ class TextMessage(BaseMessage):
 class BinaryFile(BaseMessage):
     message_type = MessageType.BINARY
 
-    # The message is a binary file. There is nothing parse
     def as_dict(self):
-        return {}
+        """Parse gzip-compressed binary message containing state updates."""
+        try:
+            if not isinstance(self.message, bytes):
+                _LOGGER.warning(f"BinaryFile message is not bytes: {type(self.message)}")
+                return {}
+            
+            # Check if it's gzip compressed (starts with 0x1f 0x8b)
+            if len(self.message) < 2 or self.message[0] != 0x1f or self.message[1] != 0x8b:
+                _LOGGER.debug("BinaryFile is not gzip compressed")
+                return {}
+            
+            # Decompress gzip data
+            try:
+                decompressed = gzip.decompress(self.message)
+            except Exception as e:
+                _LOGGER.error(f"Failed to decompress gzip data: {e}")
+                return {}
+            
+            # The decompressed data contains state tables
+            # Parse VALUE_STATES and TEXT_STATES from the decompressed data
+            result = {}
+            offset = 0
+            
+            while offset < len(decompressed):
+                # Try to parse as header (8 bytes)
+                if offset + 8 > len(decompressed):
+                    break
+                    
+                try:
+                    header = MessageHeader(decompressed[offset:offset+8])
+                    offset += 8
+                    
+                    # Extract payload
+                    if offset + header.payload_length > len(decompressed):
+                        break
+                    
+                    payload = decompressed[offset:offset+header.payload_length]
+                    offset += header.payload_length
+                    
+                    # Parse based on message type
+                    if header.message_type == MessageType.VALUE_STATES:
+                        value_states = ValueStatesTable(payload)
+                        result.update(value_states.as_dict())
+                    elif header.message_type == MessageType.TEXT_STATES:
+                        text_states = TextStatesTable(payload)
+                        result.update(text_states.as_dict())
+                        _LOGGER.debug(f"Parsed TEXT_STATES from binary: {len(text_states.as_dict())} items")
+                    
+                except Exception as e:
+                    _LOGGER.debug(f"Error parsing message at offset {offset}: {e}")
+                    break
+            
+            return result
+            
+        except Exception as e:
+            _LOGGER.error(f"Error processing BinaryFile: {e}", exc_info=True)
+            return {}
 
 
 class ValueStatesTable(BaseMessage):
