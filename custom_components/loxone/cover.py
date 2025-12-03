@@ -152,9 +152,11 @@ class LoxoneNfcCodeTouch(LoxoneEntity, CoverEntity):
 
     def open_cover(self, **kwargs):
         """Open the cover (trigger access)."""
-        # Sending 'on' usually triggers the access output for NfcCodeTouch
-        _LOGGER.debug(f"NfcCodeTouch open_cover called for {self.name}")
-        self.hass.bus.fire(SENDDOMAIN, dict(uuid=self.uuidAction, value="on"))
+        # Sending 'pulse' is the standard way to trigger a momentary output in Loxone
+        _LOGGER.debug(
+            f"NfcCodeTouch open_cover called for {self.name} with command 'pulse'"
+        )
+        self.hass.bus.fire(SENDDOMAIN, dict(uuid=self.uuidAction, value="pulse"))
         self._closed = False
         self.schedule_update_ha_state()
 
