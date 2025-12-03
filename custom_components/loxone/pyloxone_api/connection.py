@@ -342,11 +342,11 @@ class LoxoneBaseConnection:
     def _hash_token(self):
         try:
             if not self._token or not self._token.token:
-                _LOGGER.error("No token available to hash")
+                _LOGGER.debug("No token available to hash")
                 return None
 
             if not self._key:
-                _LOGGER.error("No key available for token hashing")
+                _LOGGER.debug("No key available for token hashing")
                 return None
 
             token_hash_str = f"{self._token.token}"
@@ -1049,13 +1049,21 @@ class LoxoneConnection(LoxoneBaseConnection):
         # Close websocket connection if present
         if self.connection:
             try:
-                if not self.connection.state == self.connection.state.CLOSED:
+                # Check if connection has state attribute and is not closed
+                if hasattr(self.connection, "state") and hasattr(
+                    self.connection.state, "CLOSED"
+                ):
+                    if self.connection.state != self.connection.state.CLOSED:
+                        await asyncio.wait_for(self.connection.close(), timeout=5.0)
+                        _LOGGER.debug("Websocket connection closed")
+                else:
+                    # Fallback: just try to close
                     await asyncio.wait_for(self.connection.close(), timeout=5.0)
                     _LOGGER.debug("Websocket connection closed")
             except asyncio.TimeoutError:
                 _LOGGER.warning("Timeout closing websocket connection")
             except Exception as e:
-                _LOGGER.warning(f"Error closing websocket connection: {e}")
+                _LOGGER.debug(f"Error closing websocket connection: {e}")
             finally:
                 self.connection = None
 
